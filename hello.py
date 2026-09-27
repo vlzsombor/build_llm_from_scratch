@@ -106,20 +106,43 @@ class LayerNorm(nn.Module):
         return self.scale * norm_x + self.shift
 
 
-
 class GPTModel(nn.Module):
     def __init__(self, cfg, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.emb = InputEmbedding(cfg["vocab_size"], cfg["emb_dim"], cfg["context_length"])
+        self.emb = InputEmbedding(
+            cfg["vocab_size"], cfg["emb_dim"], cfg["context_length"]
+        )
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
-        self.normalization_layer = LayerNorm(cfg["emb_dim"])
-        #...
+        self.transformer = Transformer(cfg)
+        # ...
+
     def forward(self, in_idx):
         batch_size, seq_len = in_idx.shape
         x = self.emb(in_idx)
         x = self.drop_emb(x)
-        x = self.normalization_layer(x)
-        #....
+        x = self.transformer(x)
+        return x
+
+
+class SimplifiedSelfAttention(nn.Module):
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        return x
+
+
+
+class Transformer(nn.Module):
+    def __init__(self, cfg, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.attention = SimplifiedSelfAttention()
+        self.layer1 = LayerNorm(cfg["emb_dim"])
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.attention(x)
         return x
 
 
@@ -139,11 +162,13 @@ def main():
     max_length = 4
     vocab_size = 50257
     GPT_CONFIG_124M = {
-        "vocab_size": vocab_size, # Vocabulary size
-        "context_length": max_length, # Context length
-        "emb_dim": 256, # Embedding dimension
-        "drop_rate": 0.1, # Dropout rate
+        "vocab_size": vocab_size,  # Vocabulary size
+        "context_length": max_length,  # Context length
+        "emb_dim": 256,  # Embedding dimension
+        "drop_rate": 0.1,  # Dropout rate
     }
+
+
     model = GPTModel(GPT_CONFIG_124M)
 
     dl = GPTDatasetV1.create_data_loader(
@@ -156,8 +181,8 @@ def main():
             print(res.shape)
             break
 
-
     return
+
 
 if __name__ == "__main__":
     main()

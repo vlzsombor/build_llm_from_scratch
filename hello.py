@@ -122,15 +122,23 @@ class GPTModel(nn.Module):
             cfg["vocab_size"], cfg["emb_dim"], cfg["context_length"]
         )
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
-        self.transformer = Transformer(cfg)
+        self.transformers = nn.Sequential(
+            *[Transformer(cfg) for _ in range(cfg["n_layers"])]
+        )
+        self.norm = LayerNorm(cfg["emb_dim"])
+        self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
+
         # ...
 
     def forward(self, in_idx):
         batch_size, seq_len = in_idx.shape
         x = self.emb(in_idx)
         x = self.drop_emb(x)
-        x = self.transformer(x)
-        return x
+        x = self.transformers(x)
+        x = self.norm(x)
+
+        logits = self.out_head(x)
+        return logits
 
 
 class SimplifiedSelfAttention(nn.Module):
@@ -341,18 +349,22 @@ class MultiHeadAttention(nn.Module):
         return context_vec
 
 
+class FeedForward(nn.Module):
+    def __init__(self, cfg, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.layers = nn.Sequential(
+            nn.Linear(cfg["emb_dim"], 4 * cfg["emb_dim"]),
+            nn.GELU(),
+            nn.Linear(4 * cfg["emb_dim"], cfg["emb_dim"]),
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+
+
 class Transformer(nn.Module):
     def __init__(self, cfg, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        # GPT_CONFIG_124M = {
-        # "vocab_size": 50257, # Vocabulary size
-        # "context_length": 1024, # Context length
-        # "emb_dim": 768, # Embedding dimension
-        # "n_heads": 12, # Number of attention heads
-        # "n_layers": 12, # Number of layers
-        # "drop_rate": 0.1, # Dropout rate
-        # "qkv_bias": False # Query-Key-Value bias
-        # }
         self.attention = MultiHeadAttention(
             d_in=cfg["emb_dim"],
             d_out=cfg["emb_dim"],
@@ -361,11 +373,24 @@ class Transformer(nn.Module):
             dropout=cfg["drop_rate"],
             qkv_bias=cfg["qkv_bias"],
         )
-        self.layer1 = LayerNorm(cfg["emb_dim"])
+        self.norm1 = LayerNorm(cfg["emb_dim"])
+        self.norm2 = LayerNorm(cfg["emb_dim"])
+        self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
+        self.feed_forward = FeedForward(cfg)
 
     def forward(self, x):
-        x = self.layer1(x)
+        shortcut = x
+        x = self.norm1(x)
         x = self.attention(x)
+        x = self.drop_shortcut(x)
+        x = x + shortcut
+
+        shortcut = x
+        x = self.norm2(x)
+        x = self.feed_forward(x)
+        x = self.drop_shortcut(x)
+        x = x + shortcut
+
         return x
 
 
@@ -401,9 +426,10 @@ def main():
     )
 
     for epoch in range(1):
-        for inputs, targets in dl:  # a fresh pass each epoch
-            print(inputs)
+        for inputs, targets in dl:
+            # print(inputs)
             res = model(inputs)
+            print(res.shape)
             break
 
     return

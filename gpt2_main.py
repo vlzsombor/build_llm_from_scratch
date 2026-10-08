@@ -153,7 +153,6 @@ def main(gpt_config, input_prompt, model_size):
     gpt.eval()
 
     tokenizer = tiktoken.get_encoding("gpt2")
-    torch.manual_seed(123)
 
     token_ids = generate(
         model=gpt,
@@ -168,7 +167,7 @@ def main(gpt_config, input_prompt, model_size):
 
 
 if __name__ == "__main__":
-    torch.manual_seed(123)
+    torch.manual_seed(42)
 
     CHOOSE_MODEL = "gpt2-small (124M)"
     INPUT_PROMPT = "Every effort moves you"
@@ -178,6 +177,9 @@ if __name__ == "__main__":
         "context_length": 1024,  # Context length
         "drop_rate": 0.0,  # Dropout rate
         "qkv_bias": True,  # Query-key-value bias
+        # "emb_dim": 768,
+        # "n_layers": 12,
+        # "n_heads": 12
     }
 
     model_configs = {

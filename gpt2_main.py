@@ -1,3 +1,4 @@
+import sys
 import torch
 from gpt_download import download_and_load_gpt2
 import numpy as np
@@ -5,6 +6,7 @@ import tiktoken
 import torch.nn as nn
 from typing import Any
 from DummyGpt import DummyGPTModel
+from Gpt2_interference import Gpt2
 
 
 def text_to_token_ids(text, tokenizer):
@@ -145,8 +147,7 @@ def main(gpt_config, input_prompt, model_size):
     settings, params = download_and_load_gpt2(model_size=model_size, models_dir="gpt2")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    gpt = DummyGPTModel(gpt_config)
-    print("hello2")
+    gpt = Gpt2(gpt_config)
 
     load_weights_into_gpt(gpt, params)
     gpt.to(device)
@@ -157,7 +158,7 @@ def main(gpt_config, input_prompt, model_size):
     token_ids = generate(
         model=gpt,
         idx=text_to_token_ids(input_prompt, tokenizer),
-        max_new_tokens=25,
+        max_new_tokens=250,
         context_size=gpt_config["context_length"],
         top_k=50,
         temperature=1.0,
@@ -170,6 +171,7 @@ if __name__ == "__main__":
     torch.manual_seed(42)
 
     CHOOSE_MODEL = "gpt2-small (124M)"
+    # CHOOSE_MODEL = "gpt2-medium (355M)"
     INPUT_PROMPT = "Every effort moves you"
 
     BASE_CONFIG = {
@@ -193,4 +195,4 @@ if __name__ == "__main__":
 
     BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
 
-    main(BASE_CONFIG, INPUT_PROMPT, model_size)
+    main(BASE_CONFIG, sys.argv[1], model_size)

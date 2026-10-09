@@ -10,3 +10,4 @@ wheels/
 .venv
 .codewhale
 gpt2/124M
+gpt2/355M
